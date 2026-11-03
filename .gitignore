@@ -1,0 +1,17 @@
+# Allowlist: data, reports, models, logs and results are never staged by default.
+*
+!.gitignore
+!README.md
+!INPUT_SCHEMA.md
+!run_analysis.R
+!R/
+!R/**/
+!R/**/*.R
+!config/
+!config/histology_definitions.json
+!python/
+!python/*.py
+!tests/
+!tests/*.R
+!tools/
+!tools/*.py

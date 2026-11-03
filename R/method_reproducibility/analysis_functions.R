@@ -1,0 +1,55 @@
+covnames<-c('age','old90','sex','race','marital3','dc3')
+e[,key:=.GRP,by=covnames]
+N<-nrow(e)
+strata<-split(seq_len(N),interaction(e$group,e$era,drop=TRUE))
+measures<-c('OS90','OS365','RMST90','RMST365','RMST90to365','Conditional365given90')
+km_cached<-function(m,w){
+ a<-rowsum(cbind(w,w*m$event),m$timebin,reorder=FALSE)
+ risk<-rev(cumsum(rev(a[,1])))
+ hz<-ifelse(risk>0,a[,2]/risk,0)
+ S<-cumprod(pmax(0,1-hz));tm<-m$times
+ sval<-function(tau){j<-which(tm<=tau);if(length(j))S[max(j)]else 1}
+ area<-function(tau){j<-which(tm<tau);sum(diff(c(0,tm[j],tau))*c(1,S[j]))}
+ s90<-sval(90);s365<-sval(365.25);a90<-area(90);a365<-area(365.25)
+ c(OS90=s90,OS365=s365,RMST90=a90,RMST365=a365,RMST90to365=a365-a90,Conditional365given90=if(s90>0)s365/s90 else NA_real_)
+}
+build_model<-function(target,source,label,definition,era,g,extra=NULL){
+ source<-source[order(e$t[source])]
+ zz<-rbind(e[target,covnames,with=FALSE],e[source,covnames,with=FALSE])
+ tr<-c('ns(age,df=4)','old90','factor(sex)','factor(race)','factor(marital3)','factor(dc3)')
+ tr<-tr[vapply(tr,function(v){if(grepl('^factor',v))uniqueN(zz[[sub('^factor\\((.*)\\)$','\\1',v)]])>1 else if(v=='old90')uniqueN(zz$old90)>1 else TRUE},logical(1))]
+ Xfull<-model.matrix(as.formula(paste('~',paste(tr,collapse='+'))),data=zz)
+ keys<-c(e$key[target],e$key[source]);uk<-unique(keys);bins<-match(keys,uk)
+ X<-Xfull[match(uk,keys),,drop=FALSE]
+ nt<-tabulate(head(bins,length(target)),nbins=length(uk));ns<-tabulate(tail(bins,length(source)),nbins=length(uk))
+ times<-sort(unique(e$t[source]));timebin<-match(e$t[source],times)
+ list(label=label,definition=definition,era=era,group=g,target=target,source=source,X=X,nb=length(uk),targetbin=head(bins,length(target)),sourcebin=tail(bins,length(source)),nt=nt,ns=ns,event=e$event[source],times=times,timebin=timebin,source_days=e$days[source],source_months=e$months[source])
+}
+fit_model<-function(m,counts=NULL,diagnostic=FALSE){
+ if(is.null(counts)){nt<-m$nt;ns<-m$ns;sc<-rep(1,length(m$source))}else{
+  # Reference may not cover every union key; fill via indexed rowsum labels.
+  rt<-rowsum(counts[m$target],m$targetbin,reorder=TRUE);nt<-numeric(m$nb);nt[as.integer(rownames(rt))]<-rt[,1]
+  rs<-rowsum(counts[m$source],m$sourcebin,reorder=TRUE);ns<-numeric(m$nb);ns[as.integer(rownames(rs))]<-rs[,1]
+  sc<-counts[m$source]
+ }
+ total<-nt+ns;y<-ifelse(total>0,nt/pmax(total,1),0.5)
+ f<-suppressWarnings(glm.fit(x=m$X,y=y,weights=total,family=binomial(),control=glm.control(maxit=40)))
+ if(!f$converged)return(list(values=rep(NA_real_,6),error='nonconvergence'))
+ p<-f$fitted.values[m$sourcebin]
+ if(any(!is.finite(p)|p>=1|p<=0))return(list(values=rep(NA_real_,6),error='boundary_probability'))
+ odds<-p/(1-p);w<-odds*sc
+ v<-km_cached(m,w)
+ ans<-list(values=v,error='')
+ if(diagnostic){
+  X<-m$X[,-1,drop=FALSE]
+  mt<-colSums(X*nt)/sum(nt);ms<-colSums(X*ns)/sum(ns)
+  vt<-(colSums(X^2*nt)/sum(nt)-mt^2)*sum(nt)/(sum(nt)-1)
+  vs<-(colSums(X^2*ns)/sum(ns)-ms^2)*sum(ns)/(sum(ns)-1)
+  wb<-numeric(m$nb);rs<-rowsum(w,m$sourcebin,reorder=TRUE);wb[as.integer(rownames(rs))]<-rs[,1]
+  mw<-colSums(X*wb)/sum(wb);den<-sqrt(pmax(0,(vt+vs)/2));smd<-(mt-mw)/den
+  ans$diagnostic<-c(n_target=sum(nt),n_source=sum(ns),ESS=sum(w)^2/sum(odds^2*sc),weight_max=max(odds[sc>0]),max_SMD=max(abs(smd),na.rm=TRUE))
+  ans$smd<-data.table(variable=colnames(X),SMD=smd)
+  ans$odds<-odds
+ }
+ ans
+}
