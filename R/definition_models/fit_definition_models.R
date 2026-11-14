@@ -1,18 +1,18 @@
-# Portable publication copy. Generated artifacts remain local and are ignored by Git.
+# Generated artifacts are written to local output directories.
 root <- Sys.getenv('CUP_PROJECT_ROOT', unset=normalizePath(getwd(), winslash='/'))
 setwd(root)
-for (p in c('work', 'work/histology_review', 'work/cancer_control_revision',
-            'outputs/method_reproducibility', 'outputs/stage2_preanalysis',
-            'outputs/validation_stage3', 'outputs/final_audit', 'outputs/histology_revision',
-            'outputs/pandemic_sensitivity', 'outputs/clinical_readability',
+for (p in c('work', 'work/glandular_models', 'work/landmark',
+            'outputs/standardization', 'outputs/cohort_checks',
+            'outputs/definition_models', 'outputs/era_models', 'outputs/glandular_models',
+            'outputs/pandemic_sensitivity', 'outputs/absolute_outcomes',
             'outputs/early_landmark', 'outputs/weight_capping', 'outputs/tissue_inference'))
   dir.create(p, recursive=TRUE, showWarnings=FALSE)
 options(stringsAsFactors=FALSE)
 suppressPackageStartupMessages({library(data.table);library(splines);library(parallel)})
 setDTthreads(2)
 root<-Sys.getenv('CUP_PROJECT_ROOT',unset=normalizePath(getwd(),winslash='/'))
-out<-file.path(root,'outputs/validation_stage3');dir.create(out,recursive=TRUE,showWarnings=FALSE)
-e<-readRDS(file.path(root,'work/stage2_eligible.rds'))
+out<-file.path(root,'outputs/definition_models');dir.create(out,recursive=TRUE,showWarnings=FALSE)
+e<-readRDS(file.path(root,'work/eligible_cohort.rds'))
 stopifnot(nrow(e)==381979,uniqueN(e$id)==nrow(e))
 covnames<-c('age','old90','sex','race','marital3','dc3')
 e[,key:=.GRP,by=covnames]
@@ -69,7 +69,7 @@ fit_model<-function(m,counts=NULL,diagnostic=FALSE){
  }
  ans
 }
-if(Sys.getenv('STAGE3_FUNCTIONS_ONLY')!='1'){
+if(Sys.getenv('CUP_FUNCTIONS_ONLY')!='1'){
 models<-list();point<-list();diagnostics<-list();balance<-list()
 for(def in c('Broad','Strict8140')){
  target<-which(e$group=='CUP'&(def=='Broad'|e$hist==8140))
@@ -87,11 +87,11 @@ pt<-rbindlist(point);dg<-rbindlist(diagnostics)
 fwrite(pt,file.path(out,'01_fixed_target_point_estimates.csv'),bom=TRUE)
 fwrite(dg,file.path(out,'02_weight_diagnostics.csv'),bom=TRUE)
 fwrite(rbindlist(balance),file.path(out,'03_balance.csv'),bom=TRUE)
-# Compressed binomial likelihood must reproduce the prior full-record glm estimates.
-old<-fread(file.path(root,'outputs/stage2_preanalysis/17_fixed_target_era_OS.csv'))
-chk<-merge(pt[measure=='OS365'],old[,.(definition,era,group,old=OS365)],by=c('definition','era','group'))
-stopifnot(max(abs(chk$estimate-chk$old))<1e-7)
-saveRDS(models,file.path(root,'work/stage3_model_cache.rds'))
+# Compressed binomial likelihood must reproduce the full-record glm estimates.
+reference_result<-fread(file.path(root,'outputs/cohort_checks/17_fixed_target_era_OS.csv'))
+chk<-merge(pt[measure=='OS365'],reference_result[,.(definition,era,group,reference_result=OS365)],by=c('definition','era','group'))
+stopifnot(max(abs(chk$estimate-chk$reference_result))<1e-7)
+saveRDS(models,file.path(root,'work/definition_model_cache.rds'))
 replicate_fit<-function(b){
  set.seed(20261025+b)
  counts<-integer(N)
@@ -109,12 +109,12 @@ if('--bench'%in%commandArgs(trailingOnly=TRUE)){
  quit(save='no')
 }
 B<-2000L
-cl<-makeCluster(as.integer(Sys.getenv('CUP_WORKERS','2')),outfile=file.path(root,'work/stage3_workers.log'))
+cl<-makeCluster(as.integer(Sys.getenv('CUP_WORKERS','2')),outfile=file.path(root,'work/definition_workers.log'))
 clusterEvalQ(cl,{library(data.table);setDTthreads(1);NULL})
 clusterExport(cl,c('N','strata','models','measures','replicate_fit','fit_model','km_cached'),envir=environment())
-checkpoint<-file.path(root,'work/stage3_bootstrap_checkpoint.rds')
-signature<-list(input_md5=unname(tools::md5sum(file.path(root,'work/stage2_eligible.rds'))),labels=names(models),measures=measures,seed_base=20261025,N=N)
-signature_file<-file.path(root,'work/stage3_checkpoint_signature.rds')
+checkpoint<-file.path(root,'work/definition_bootstrap_checkpoint.rds')
+signature<-list(input_md5=unname(tools::md5sum(file.path(root,'work/eligible_cohort.rds'))),labels=names(models),measures=measures,seed_base=20261025,N=N)
+signature_file<-file.path(root,'work/definition_checkpoint_signature.rds')
 if(file.exists(signature_file))stopifnot(identical(signature,readRDS(signature_file)))else saveRDS(signature,signature_file)
 allboot<-if(file.exists(checkpoint))readRDS(checkpoint)else list()
 stopifnot(length(allboot)<=B)
@@ -124,7 +124,7 @@ for(start in starts){
  ids<-start:min(B,start+49)
  x<-parLapplyLB(cl,ids,replicate_fit)
  allboot<-c(allboot,x)
- saveRDS(allboot,file.path(root,'work/stage3_bootstrap_checkpoint.rds'))
+ saveRDS(allboot,file.path(root,'work/definition_bootstrap_checkpoint.rds'))
  cat('Completed',length(allboot),'/',B,'replicates at',format(Sys.time()),'\n');flush.console()
 }
 stopCluster(cl)
@@ -132,6 +132,6 @@ saveRDS(allboot,file.path(out,'bootstrap_replicates.rds'))
 failure<-rbindlist(lapply(allboot,function(x)data.table(replicate=x$b,label=names(models),error=x$error)))
 fwrite(failure[nzchar(error)],file.path(out,'04_bootstrap_failures.csv'),bom=TRUE)
 if(mean(vapply(allboot,function(x)all(!nzchar(x$error)),logical(1)))<.95)stop('Fewer than95% all-model successful replicates; inspect failures')
-writeLines('Bootstrap completed; next run summarize_validation.R.',file.path(out,'BOOTSTRAP_COMPLETE.txt'))
+writeLines('Bootstrap completed; next run summarize_definition_models.R.',file.path(out,'BOOTSTRAP_COMPLETE.txt'))
 capture.output(sessionInfo(),file=file.path(out,'R_sessionInfo.txt'))
 }

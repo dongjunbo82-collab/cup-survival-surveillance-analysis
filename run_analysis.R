@@ -3,27 +3,30 @@ options(stringsAsFactors=FALSE)
 root <- normalizePath(Sys.getenv('CUP_PROJECT_ROOT', unset=getwd()), winslash='/')
 setwd(root); Sys.setenv(CUP_PROJECT_ROOT=root)
 steps <- list(
-  prepare='R/method_reproducibility/prepare_eligible.R',
-  full_record_check='R/stage2_preanalysis/fixed_target_era_check.R',
-  broad_fit='R/validation_stage3/run_validation.R',
-  broad_summary='R/validation_stage3/summarize_validation.R',
-  four_era_fit='R/final_audit/run_final_audit.R',
-  four_era_summary='R/final_audit/summarize_final_audit.R',
-  glandular_fit='R/histology_revision/run_revision.R',
-  glandular_summary='R/histology_revision/summarize_revision.R',
-  definition_sensitivities='R/histology_revision/revision_sensitivities.R',
-  interval_precision='R/histology_revision/check_interval_precision.R',
+  prepare='R/standardization/prepare_eligible.R',
+  full_record_check='R/cohort_checks/fixed_target_era_check.R',
+  broad_fit='R/definition_models/fit_definition_models.R',
+  broad_summary='R/definition_models/summarize_definition_models.R',
+  four_era_fit='R/era_models/fit_era_models.R',
+  four_era_summary='R/era_models/summarize_era_models.R',
+  glandular_fit='R/glandular_models/fit_glandular_models.R',
+  glandular_summary='R/glandular_models/summarize_glandular_models.R',
+  definition_sensitivities='R/glandular_models/definition_sensitivities.R',
+  interval_precision='R/glandular_models/check_interval_precision.R',
   pandemic='R/pandemic_sensitivity/pandemic_sensitivity.R',
-  absolute_outcomes='R/clinical_readability/clinical_readability.R',
-  early_reference='R/method_reproducibility/early_reference_sensitivity.R',
-  reference_reproduction='R/method_reproducibility/reproduce_first_last.R',
+  absolute_outcomes='R/absolute_outcomes/absolute_outcomes.R',
+  early_reference='R/standardization/early_reference_sensitivity.R',
+  reference_reproduction='R/standardization/reproduce_first_last.R',
   weights='R/weight_capping/weight_sensitivity.R',
   landmark='R/early_landmark/early_landmark_diagnostics.R',
   early_outcomes='R/early_landmark/early_era_summary.R',
   histologic_confirmation='R/tissue_inference/tissue_inference.R',
-  survival_figures='R/histology_revision/make_figures.R',
-  annual_composition='R/method_reproducibility/plot_annual_composition.R',
-  early_outcomes_figure='R/precision_polish/plot_S4_early_outcomes.R'
+  clinical_analyses='R/clinical_analyses/clinical_analyses.R',
+  cause_specific='R/cause_specific/cause_specific.R',
+  survival_figures='R/glandular_models/make_figures.R',
+  annual_composition='R/standardization/plot_annual_composition.R',
+  early_outcomes_figure='R/figures/plot_early_outcomes.R',
+  survival_gaps_figure='R/figures/plot_survival_gaps.R'
 )
 args <- commandArgs(TRUE)
 if (!length(args) || identical(args,'list')) {

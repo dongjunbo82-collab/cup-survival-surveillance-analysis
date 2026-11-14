@@ -1,5 +1,5 @@
 {
-  "reviewed_keep_codes": [
+  "glandular_codes": [
     8140,
     8141,
     8142,
@@ -54,7 +54,7 @@
     8573,
     8576
   ],
-  "reviewed_excluded_observed": [
+  "glandular_excluded_observed": [
     8146,
     8150,
     8151,

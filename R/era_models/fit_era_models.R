@@ -1,17 +1,17 @@
-# Portable publication copy. Generated artifacts remain local and are ignored by Git.
+# Generated artifacts are written to local output directories.
 root <- Sys.getenv('CUP_PROJECT_ROOT', unset=normalizePath(getwd(), winslash='/'))
 setwd(root)
-for (p in c('work', 'work/histology_review', 'work/cancer_control_revision',
-            'outputs/method_reproducibility', 'outputs/stage2_preanalysis',
-            'outputs/validation_stage3', 'outputs/final_audit', 'outputs/histology_revision',
-            'outputs/pandemic_sensitivity', 'outputs/clinical_readability',
+for (p in c('work', 'work/glandular_models', 'work/landmark',
+            'outputs/standardization', 'outputs/cohort_checks',
+            'outputs/definition_models', 'outputs/era_models', 'outputs/glandular_models',
+            'outputs/pandemic_sensitivity', 'outputs/absolute_outcomes',
             'outputs/early_landmark', 'outputs/weight_capping', 'outputs/tissue_inference'))
   dir.create(p, recursive=TRUE, showWarnings=FALSE)
 options(stringsAsFactors=FALSE)
-Sys.setenv(STAGE3_FUNCTIONS_ONLY='1')
-source('R/validation_stage3/run_validation.R',encoding='UTF-8')
-Sys.unsetenv('STAGE3_FUNCTIONS_ONLY')
-out<-file.path(root,'outputs/final_audit');dir.create(out,recursive=TRUE,showWarnings=FALSE)
+Sys.setenv(CUP_FUNCTIONS_ONLY='1')
+source('R/definition_models/fit_definition_models.R',encoding='UTF-8')
+Sys.unsetenv('CUP_FUNCTIONS_ONLY')
+out<-file.path(root,'outputs/era_models');dir.create(out,recursive=TRUE,showWarnings=FALSE)
 groups<-c('CUP','Lung','Pancreas','Colorectal','Stomach');eras<-levels(e$era)
 write_tab<-function(name,z)fwrite(z,file.path(out,paste0(name,'.csv')),bom=TRUE,na='NA')
 models<-list();points<-list();diags<-list();balance<-list();curves<-list();risks<-list();support<-list()
@@ -61,11 +61,11 @@ write_tab('09_era_covariate_composition',rbindlist(lapply(c('sex','race','marita
 write_tab('10_era_followup',e[,.(n=.N,dead=sum(event),zero_days=sum(days==0),alive_zero=sum(days==0&event==0),zero_months=sum(months==0),alive_censor_under1y=sum(event==0&t<365.25),incomplete_dates=sum(!grepl('^Complete',flag))),by=.(group,era)])
 write_tab('11_yearly_organ_labels',melt(e[,.(group,year,bone,brain,liver,lung)],id.vars=c('group','year'),variable.name='organ',value.name='label')[,.N,by=.(group,year,organ,label)])
 write_tab('12_year_composition',e[,.N,by=.(group,era,year)][,proportion:=N/sum(N),by=.(group,era)])
-saveRDS(models,file.path(root,'work/final_audit_models.rds'))
+saveRDS(models,file.path(root,'work/era_models_models.rds'))
 cat('Models:',length(models),' Annual support failures:',nrow(dg[scope=='Annual'&!support_pass]),'\n')
 print(dg[scope=='Annual'&!support_pass,.(definition,period,group,n_source,ESS,max_SMD)])
 flush.console()
-# Pair the additional models with the original seed and patient draws; original
+# Pair model sets using shared seeds and patient draws.
 # 30-era-model replicates can then be reused without resampling inconsistency.
 bootnames<-names(models)[vapply(models,function(m)!grepl('^Era__',m$label)||m$era=='2008-2014',logical(1))]
 newmodels<-models[bootnames]
@@ -77,7 +77,7 @@ replicate_final<-function(b){
   f<-tryCatch(fit_model(newmodels[[i]],counts),error=function(ex)list(values=rep(NA_real_,6),error=conditionMessage(ex)))
   v[i,]<-f$values;err[i]<-f$error
  }
- # q resampled within original group-era strata, sharing reference CUP draws.
+ # q resampled within broad-cohort group-era strata, sharing reference CUP draws.
  q<-as.numeric(rowsum(counts[cupidx],cupyears,reorder=TRUE))
  qs<-as.numeric(rowsum(counts[strictidx],strictyears,reorder=TRUE))
  list(b=b,v=v,error=err,q=q,qs=qs)
@@ -90,12 +90,12 @@ if('--bench'%in%commandArgs(TRUE)){
  print(system.time(z<-lapply(1:3,replicate_final)));print(lapply(z,function(z)table(z$error)));quit(save='no')
 }
 B<-2000L
-signature<-list(input_md5=unname(tools::md5sum(file.path(root,'work/stage2_eligible.rds'))),labels=bootnames,seed=20261025,B=B)
-sigfile<-file.path(root,'work/final_audit_signature.rds');checkpoint<-file.path(root,'work/final_audit_checkpoint.rds')
+signature<-list(input_md5=unname(tools::md5sum(file.path(root,'work/eligible_cohort.rds'))),labels=bootnames,seed=20261025,B=B)
+sigfile<-file.path(root,'work/era_models_signature.rds');checkpoint<-file.path(root,'work/era_models_checkpoint.rds')
 if(file.exists(sigfile))stopifnot(identical(signature,readRDS(sigfile)))else saveRDS(signature,sigfile)
 allboot<-if(file.exists(checkpoint))readRDS(checkpoint)else list()
 stopifnot(length(allboot)<=B)
-cl<-makeCluster(as.integer(Sys.getenv('CUP_WORKERS','2')),outfile=file.path(root,'work/final_audit_workers.log'))
+cl<-makeCluster(as.integer(Sys.getenv('CUP_WORKERS','2')),outfile=file.path(root,'work/era_models_workers.log'))
 clusterEvalQ(cl,{library(data.table);setDTthreads(1);NULL})
 clusterExport(cl,c('N','strata','newmodels','measures','replicate_final','fit_model','km_cached','cupidx','strictidx','cupyears','strictyears'),envir=environment())
 starts<-if(length(allboot)<B)seq(length(allboot)+1L,B,by=25)else integer()

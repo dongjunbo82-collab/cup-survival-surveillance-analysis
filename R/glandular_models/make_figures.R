@@ -1,23 +1,23 @@
-# Portable publication copy. Generated artifacts remain local and are ignored by Git.
+# Generated artifacts are written to local output directories.
 root <- Sys.getenv('CUP_PROJECT_ROOT', unset=normalizePath(getwd(), winslash='/'))
 setwd(root)
-for (p in c('work', 'work/histology_review', 'work/cancer_control_revision',
-            'outputs/method_reproducibility', 'outputs/stage2_preanalysis',
-            'outputs/validation_stage3', 'outputs/final_audit', 'outputs/histology_revision',
-            'outputs/pandemic_sensitivity', 'outputs/clinical_readability',
+for (p in c('work', 'work/glandular_models', 'work/landmark',
+            'outputs/standardization', 'outputs/cohort_checks',
+            'outputs/definition_models', 'outputs/era_models', 'outputs/glandular_models',
+            'outputs/pandemic_sensitivity', 'outputs/absolute_outcomes',
             'outputs/early_landmark', 'outputs/weight_capping', 'outputs/tissue_inference'))
   dir.create(p, recursive=TRUE, showWarnings=FALSE)
 library(data.table)
 root <- Sys.getenv('CUP_PROJECT_ROOT',unset=normalizePath(getwd(),winslash='/'))
-out <- file.path(root,'outputs/histology_revision')
-dest <- file.path(root,'outputs/concise_manuscript')
+out <- file.path(root,'outputs/glandular_models')
+dest <- file.path(root,'outputs/figures')
 dir.create(dest,recursive=TRUE,showWarnings=FALSE)
-cur <- fread(file.path(out,'07_reviewed_curves.csv'))
+cur <- fread(file.path(out,'07_glandular_curves.csv'))
 risk <- fread(file.path(out,'08_risk_support.csv'))
 groups <- c('CUP','Lung','Pancreas','Colorectal','Stomach')
 cols <- c('#202020','#2166AC','#D97706','#228833','#8856A7')
 eras <- c('2004-2007','2008-2014','2015-2019','2020-2022')
-png(file.path(dest,'Figure1_survival_curves.png'),width=2400,height=2300,res=300)
+png(file.path(dest,'FigureS2_survival_curves.png'),width=2400,height=2300,res=300)
 layout(matrix(c(1,3,2,4,5,7,6,8),4,2,byrow=TRUE),heights=c(3.2,1.25,3.2,1.25))
 par(oma=c(.7,.5,1.3,.2),family='sans',cex=.88)
 for(j in seq_along(eras)){
@@ -39,8 +39,8 @@ for(j in seq_along(eras)){
  }
 }
 dev.off()
-gaps<-fread(file.path(out,'16_gaps_CI.csv'))[definition=='Reviewed'&era=='2020-2022'&measure%in%c('OS90','OS365')]
-png(file.path(dest,'Figure2_time_window_gaps.png'),width=2400,height=1450,res=300)
+gaps<-fread(file.path(out,'16_gaps_CI.csv'))[definition=='Glandular'&era=='2020-2022'&measure%in%c('OS90','OS365')]
+png(file.path(dest,'FigureS4_time_window_gaps.png'),width=2400,height=1450,res=300)
 par(mar=c(4.6,7,2.6,1),family='sans',cex=1)
 plot(NA,xlim=c(-48,5),ylim=c(.45,4.65),xlab='CUP minus known-primary survival (percentage points)',ylab='',yaxt='n',xaxs='i')
 axis(2,at=4:1,labels=groups[-1],las=1,tick=FALSE)

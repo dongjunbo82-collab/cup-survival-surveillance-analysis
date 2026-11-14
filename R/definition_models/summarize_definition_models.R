@@ -1,18 +1,18 @@
-# Portable publication copy. Generated artifacts remain local and are ignored by Git.
+# Generated artifacts are written to local output directories.
 root <- Sys.getenv('CUP_PROJECT_ROOT', unset=normalizePath(getwd(), winslash='/'))
 setwd(root)
-for (p in c('work', 'work/histology_review', 'work/cancer_control_revision',
-            'outputs/method_reproducibility', 'outputs/stage2_preanalysis',
-            'outputs/validation_stage3', 'outputs/final_audit', 'outputs/histology_revision',
-            'outputs/pandemic_sensitivity', 'outputs/clinical_readability',
+for (p in c('work', 'work/glandular_models', 'work/landmark',
+            'outputs/standardization', 'outputs/cohort_checks',
+            'outputs/definition_models', 'outputs/era_models', 'outputs/glandular_models',
+            'outputs/pandemic_sensitivity', 'outputs/absolute_outcomes',
             'outputs/early_landmark', 'outputs/weight_capping', 'outputs/tissue_inference'))
   dir.create(p, recursive=TRUE, showWarnings=FALSE)
 suppressPackageStartupMessages(library(data.table))
 setDTthreads(2)
-root<-Sys.getenv('CUP_PROJECT_ROOT',unset=normalizePath(getwd(),winslash='/'));out<-file.path(root,'outputs/validation_stage3')
+root<-Sys.getenv('CUP_PROJECT_ROOT',unset=normalizePath(getwd(),winslash='/'));out<-file.path(root,'outputs/definition_models')
 pt<-fread(file.path(out,'01_fixed_target_point_estimates.csv'))
 boot<-readRDS(file.path(out,'bootstrap_replicates.rds'))
-models<-readRDS(file.path(root,'work/stage3_model_cache.rds'))
+models<-readRDS(file.path(root,'work/definition_model_cache.rds'))
 measures<-unique(pt$measure)
 meta<-unique(pt[,.(label,definition,era,group)])
 stopifnot(identical(meta$label,names(models)),length(boot)>=1000)

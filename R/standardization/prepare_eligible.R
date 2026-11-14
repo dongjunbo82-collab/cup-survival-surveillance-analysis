@@ -1,16 +1,16 @@
-# Portable publication copy. Generated artifacts remain local and are ignored by Git.
+# Generated artifacts are written to local output directories.
 root <- Sys.getenv('CUP_PROJECT_ROOT', unset=normalizePath(getwd(), winslash='/'))
 setwd(root)
-for (p in c('work', 'work/histology_review', 'work/cancer_control_revision',
-            'outputs/method_reproducibility', 'outputs/stage2_preanalysis',
-            'outputs/validation_stage3', 'outputs/final_audit', 'outputs/histology_revision',
-            'outputs/pandemic_sensitivity', 'outputs/clinical_readability',
+for (p in c('work', 'work/glandular_models', 'work/landmark',
+            'outputs/standardization', 'outputs/cohort_checks',
+            'outputs/definition_models', 'outputs/era_models', 'outputs/glandular_models',
+            'outputs/pandemic_sensitivity', 'outputs/absolute_outcomes',
             'outputs/early_landmark', 'outputs/weight_capping', 'outputs/tissue_inference'))
   dir.create(p, recursive=TRUE, showWarnings=FALSE)
 options(stringsAsFactors=FALSE)
 suppressPackageStartupMessages({library(data.table);library(survival);library(splines)})
 setDTthreads(2)
-root<-Sys.getenv('CUP_PROJECT_ROOT',unset=normalizePath(getwd(),winslash='/'));out<-file.path(root,'outputs/method_reproducibility/preparation_audit');dir.create(file.path(root,'work'),recursive=TRUE,showWarnings=FALSE)
+root<-Sys.getenv('CUP_PROJECT_ROOT',unset=normalizePath(getwd(),winslash='/'));out<-file.path(root,'outputs/standardization/preparation_audit');dir.create(file.path(root,'work'),recursive=TRUE,showWarnings=FALSE)
 src<-Sys.getenv('CUP_EXPORT_DIR');stopifnot(nzchar(src),dir.exists(src))
 dir.create(out,recursive=TRUE,showWarnings=FALSE)
 save_table<-function(n,x)fwrite(x,file.path(out,paste0(n,'.csv')),bom=TRUE,na='NA')
@@ -53,4 +53,4 @@ e[,income4:=fifelse(is.na(income_num),'Unknown',as.character(cut(income_num,c(-I
 e[,era:=cut(year,c(2003,2007,2014,2019,2022),labels=c('2004-2007','2008-2014','2015-2019','2020-2022'))]
 e[,organ_complete:=bone%in%c('Yes','No')&brain%in%c('Yes','No')&liver%in%c('Yes','No')&lung%in%c('Yes','No')]
 e[,organ_positive:=bone=='Yes'|brain=='Yes'|liver=='Yes'|lung=='Yes']
-saveRDS(e,file.path(root,'work/stage2_eligible.rds'))
+saveRDS(e,file.path(root,'work/eligible_cohort.rds'))

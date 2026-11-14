@@ -1,17 +1,17 @@
-# Portable publication copy. Generated artifacts remain local and are ignored by Git.
+# Generated artifacts are written to local output directories.
 root <- Sys.getenv('CUP_PROJECT_ROOT', unset=normalizePath(getwd(), winslash='/'))
 setwd(root)
-for (p in c('work', 'work/histology_review', 'work/cancer_control_revision',
-            'outputs/method_reproducibility', 'outputs/stage2_preanalysis',
-            'outputs/validation_stage3', 'outputs/final_audit', 'outputs/histology_revision',
-            'outputs/pandemic_sensitivity', 'outputs/clinical_readability',
+for (p in c('work', 'work/glandular_models', 'work/landmark',
+            'outputs/standardization', 'outputs/cohort_checks',
+            'outputs/definition_models', 'outputs/era_models', 'outputs/glandular_models',
+            'outputs/pandemic_sensitivity', 'outputs/absolute_outcomes',
             'outputs/early_landmark', 'outputs/weight_capping', 'outputs/tissue_inference'))
   dir.create(p, recursive=TRUE, showWarnings=FALSE)
 options(stringsAsFactors=FALSE)
 suppressPackageStartupMessages({library(data.table);library(splines);library(jsonlite);library(parallel)})
 setDTthreads(1);root<-normalizePath(getwd(),winslash='/');out<-'outputs/early_landmark';dir.create(out,recursive=TRUE,showWarnings=FALSE)
-write_json(list(status='Post hoc supplement; primary comparisons unchanged',date='2026-11-02',survivor_rule='Observed beyond day 90: t>90; exclude deaths and censoring at or before 90, including exactly day 90',landmark_reference='Reviewed CUP patients diagnosed 2020-2022 and observed beyond day 90',landmark_gate='Proceed only if baseline survivor max pairwise SMD >=0.10 and both landmark fits have n>=100, ESS>=200, max absolute SMD<0.10',model='Same age spline and categorical covariates; no capping',bootstrap='2000 shared original group-era patient draws, seed 20261025+b; target and source refitted within draw',inference='Nominal descriptive 95% percentile interval, no new confirmatory family'),file.path(out,'specification.json'),pretty=TRUE)
-e<-readRDS('work/stage2_eligible.rds');source('R/method_reproducibility/analysis_functions.R');cfg<-fromJSON('config/histology_definitions.json');keep<-e$hist%in%cfg$reviewed_keep_codes;eras<-c('2004-2007','2008-2014','2015-2019','2020-2022');groups<-c('CUP','Lung','Pancreas','Colorectal','Stomach');target<-which(keep&e$group=='CUP');models<-list();weightdiag<-list();profiles<-list();dcprofile<-list();survsummary<-list();survbalance<-list();landmarkcounts<-list()
+write_json(list(status='Exploratory landmark analysis',survivor_rule='Observed beyond day 90: t>90; exclude deaths and censoring at or before 90, including exactly day 90',landmark_reference='Glandular CUP patients diagnosed 2020-2022 and observed beyond day 90',landmark_gate='Proceed only if baseline survivor max pairwise SMD >=0.10 and both landmark fits have n>=100, ESS>=200, max absolute SMD<0.10',model='Same age spline and categorical covariates; no capping',bootstrap='2000 shared broad-cohort group-era patient draws, seed 20261025+b; target and source refitted within draw',inference='Nominal descriptive 95% percentile interval, descriptive inference'),file.path(out,'specification.json'),pretty=TRUE)
+e<-readRDS('work/eligible_cohort.rds');source('R/standardization/analysis_functions.R');cfg<-fromJSON('config/histology_definitions.json');keep<-e$hist%in%cfg$glandular_codes;eras<-c('2004-2007','2008-2014','2015-2019','2020-2022');groups<-c('CUP','Lung','Pancreas','Colorectal','Stomach');target<-which(keep&e$group=='CUP');models<-list();weightdiag<-list();profiles<-list();dcprofile<-list();survsummary<-list();survbalance<-list();landmarkcounts<-list()
 for(er in eras)for(g in groups){if(!er%in%c(eras[1],eras[4])&&!g%in%c('CUP','Pancreas'))next
  lab<-paste('Pooled',er,g,sep='__');m<-build_model(target,which(keep&e$group==g&as.character(e$era)==er),lab,'Pooled',er,g);f<-fit_model(m,diagnostic=TRUE);stopifnot(!nzchar(f$error));models[[lab]]<-list(m=m,f=f)
 }
@@ -35,7 +35,7 @@ gate<-all(ld$n_source>=100&ld$ESS>=200&ld$max_SMD<.1)&&max(abs(survbalance[[eras
 write_json(list(gate_passed=gate,target_n=length(tt),baseline_survivor_max_SMD=max(abs(survbalance[[eras[4]]]$SMD),na.rm=TRUE),landmark_diagnostics=ld),file.path(out,'landmark_gate.json'),pretty=TRUE)
 print(ld);print(rbindlist(survsummary));if(!gate){cat('Landmark inference not run: gate failed\n');quit(status=0)}
 repfit<-function(b){set.seed(20261025+b);counts<-integer(N);for(idx in strata)counts[idx]<-tabulate(sample.int(length(idx),length(idx),replace=TRUE),nbins=length(idx));v<-vapply(lm,function(m){f<-fit_model(m,counts);if(nzchar(f$error))return(NA_real_);f$values[2]},numeric(1));c(v,difference=v[1]-v[2])}
-B<-2000L;cp<-'work/cancer_control_revision/landmark_bootstrap.rds';sig<-list(input=unname(tools::md5sum('work/stage2_eligible.rds')),code=unname(tools::md5sum('R/early_landmark/early_landmark_diagnostics.R')),function_md5=unname(tools::md5sum('R/method_reproducibility/analysis_functions.R')),B=B,seed=20261025);sigfile<-paste0(cp,'.signature.rds');if(file.exists(sigfile))stopifnot(identical(sig,readRDS(sigfile)))else saveRDS(sig,sigfile);boot<-if(file.exists(cp))readRDS(cp)else list()
-cl<-makeCluster(as.integer(Sys.getenv('CUP_WORKERS','2')),outfile='work/cancer_control_revision/landmark_workers.log');clusterEvalQ(cl,{library(data.table);setDTthreads(1);NULL});clusterExport(cl,c('N','strata','lm','repfit','fit_model','km_cached'),envir=environment())
+B<-2000L;cp<-'work/landmark/landmark_bootstrap.rds';sig<-list(input=unname(tools::md5sum('work/eligible_cohort.rds')),code=unname(tools::md5sum('R/early_landmark/early_landmark_diagnostics.R')),function_md5=unname(tools::md5sum('R/standardization/analysis_functions.R')),B=B,seed=20261025);sigfile<-paste0(cp,'.signature.rds');if(file.exists(sigfile))stopifnot(identical(sig,readRDS(sigfile)))else saveRDS(sig,sigfile);boot<-if(file.exists(cp))readRDS(cp)else list()
+cl<-makeCluster(as.integer(Sys.getenv('CUP_WORKERS','2')),outfile='work/landmark/landmark_workers.log');clusterEvalQ(cl,{library(data.table);setDTthreads(1);NULL});clusterExport(cl,c('N','strata','lm','repfit','fit_model','km_cached'),envir=environment())
 for(start in if(length(boot)<B)seq(length(boot)+1L,B,by=100)else integer()){boot<-c(boot,parLapplyLB(cl,start:min(B,start+99L),repfit));saveRDS(boot,cp);cat('Completed',length(boot),'/2000\n');flush.console()};stopCluster(cl)
 bb<-do.call(rbind,boot);p<-c(lp$estimate,lp$estimate[1]-lp$estimate[2]);res<-data.table(group=c('CUP','Pancreas','CUP-minus-pancreas'),estimate=p,lo=apply(bb,2,quantile,.025,na.rm=TRUE),hi=apply(bb,2,quantile,.975,na.rm=TRUE),valid_draws=colSums(is.finite(bb)));fwrite(res,file.path(out,'landmark_estimates_CI.csv'));print(res)

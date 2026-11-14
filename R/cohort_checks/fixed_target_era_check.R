@@ -1,19 +1,19 @@
-# Portable publication copy. Generated artifacts remain local and are ignored by Git.
+# Generated artifacts are written to local output directories.
 root <- Sys.getenv('CUP_PROJECT_ROOT', unset=normalizePath(getwd(), winslash='/'))
 setwd(root)
-for (p in c('work', 'work/histology_review', 'work/cancer_control_revision',
-            'outputs/method_reproducibility', 'outputs/stage2_preanalysis',
-            'outputs/validation_stage3', 'outputs/final_audit', 'outputs/histology_revision',
-            'outputs/pandemic_sensitivity', 'outputs/clinical_readability',
+for (p in c('work', 'work/glandular_models', 'work/landmark',
+            'outputs/standardization', 'outputs/cohort_checks',
+            'outputs/definition_models', 'outputs/era_models', 'outputs/glandular_models',
+            'outputs/pandemic_sensitivity', 'outputs/absolute_outcomes',
             'outputs/early_landmark', 'outputs/weight_capping', 'outputs/tissue_inference'))
   dir.create(p, recursive=TRUE, showWarnings=FALSE)
-# Predefined follow-up to distinguish demographic composition shifts from era gaps.
+# Compare demographic composition and calendar-era survival gaps.
 # Uses all-period eligible CUP as a fixed measured-covariate reference, not a causal population.
 options(stringsAsFactors=FALSE)
 suppressPackageStartupMessages({library(data.table);library(splines)})
 setDTthreads(2)
-out<-'outputs/stage2_preanalysis'
-e<-readRDS('work/stage2_eligible.rds')
+out<-'outputs/cohort_checks'
+e<-readRDS('work/eligible_cohort.rds')
 km<-function(z,w){q<-data.table(t=z$t,event=z$event,w=w)[,.(exit=sum(w),D=sum(w*event)),by=t][order(t)];q[,risk:=rev(cumsum(rev(exit)))];q[,S:=cumprod(pmax(0,1-D/risk))];s<-sapply(c(90,365.25),function(tau){j<-which(q$t<=tau);if(length(j))q$S[max(j)]else 1});qt<-q[t<365.25];c(OS90=s[1],OS365=s[2],RMST365=sum(diff(c(0,qt$t,365.25))*c(1,qt$S)))}
 results<-list();diags<-list()
 for(def in c('Broad','Strict8140')){

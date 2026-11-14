@@ -8,7 +8,7 @@ e <- data.table(age=sample(20:85,n,TRUE),old90=0L,sex=sample(c('Female','Male'),
                 group=rep(c('CUP','Lung'),each=n/2),era=rep('Early',n),
                 t=sample(seq(.5,500,.5),n,TRUE),event=rbinom(n,1,.65))
 e[,`:=`(days=t,months=t/(365.25/12))]
-source('R/method_reproducibility/analysis_functions.R')
+source('R/standardization/analysis_functions.R')
 m <- build_model(which(e$group=='CUP'),which(e$group=='Lung'),'smoke','Synthetic','Early','Lung')
 z <- fit_model(m,diagnostic=TRUE);stopifnot(identical(z$error,''),all(is.finite(z$values)))
 # Compressed logistic likelihood versus an explicit stacked-record fit.

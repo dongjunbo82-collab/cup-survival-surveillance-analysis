@@ -1,14 +1,14 @@
-# Portable publication copy. Generated artifacts remain local and are ignored by Git.
+# Generated artifacts are written to local output directories.
 root <- Sys.getenv('CUP_PROJECT_ROOT', unset=normalizePath(getwd(), winslash='/'))
 setwd(root)
-for (p in c('work', 'work/histology_review', 'work/cancer_control_revision',
-            'outputs/method_reproducibility', 'outputs/stage2_preanalysis',
-            'outputs/validation_stage3', 'outputs/final_audit', 'outputs/histology_revision',
-            'outputs/pandemic_sensitivity', 'outputs/clinical_readability',
+for (p in c('work', 'work/glandular_models', 'work/landmark',
+            'outputs/standardization', 'outputs/cohort_checks',
+            'outputs/definition_models', 'outputs/era_models', 'outputs/glandular_models',
+            'outputs/pandemic_sensitivity', 'outputs/absolute_outcomes',
             'outputs/early_landmark', 'outputs/weight_capping', 'outputs/tissue_inference'))
   dir.create(p, recursive=TRUE, showWarnings=FALSE)
-Sys.setenv(STAGE3_FUNCTIONS_ONLY='1');source('R/validation_stage3/run_validation.R',encoding='UTF-8');Sys.unsetenv('STAGE3_FUNCTIONS_ONLY')
-library(jsonlite);setDTthreads(1);out<-file.path(root,'outputs/histology_revision');cfg<-fromJSON(file.path(root,'config/histology_definitions.json'));base<-e$hist%in%cfg$reviewed_keep_codes;base_t<-e$t
+Sys.setenv(CUP_FUNCTIONS_ONLY='1');source('R/definition_models/fit_definition_models.R',encoding='UTF-8');Sys.unsetenv('CUP_FUNCTIONS_ONLY')
+library(jsonlite);setDTthreads(1);out<-file.path(root,'outputs/glandular_models');cfg<-fromJSON(file.path(root,'config/histology_definitions.json'));base<-e$hist%in%cfg$glandular_codes;base_t<-e$t
 rr<-list();dd<-list()
 for(sens in c('Tissue_only','Complete_dates','Month_scale','Exclude_appendix','Socioeconomic_expanded')){
  use<-base&switch(sens,Tissue_only=e$dc3=='Histology',Complete_dates=grepl('^Complete',e$flag),Exclude_appendix=!(e$group=='Colorectal'&startsWith(e$site,'C18.1-')),rep(TRUE,N))

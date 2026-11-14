@@ -79,3 +79,38 @@ The optional incidence verifier expects tab-separated quoted headers:
 `Std Pop`. Export a total row and annual rows. Only 2004–2022 enter the annual
 series; out-of-range zero-population rows are omitted. This is a separate
 population-denominator analysis, not a rate calculated from survival-eligible cases.
+
+## Cause-specific death classification inputs
+
+Set CUP_CSS_EXPORT_DIR to five tab-delimited files with headers exported from
+the same SEER release and case definitions as the case listing inputs.
+
+| Group | Filename |
+|---|---|
+| CUP | S2_CUP_Adeno_2004_2022_labels.txt |
+| Lung | S2_Lung_Adeno_Distant_2004_2022_CSS.txt |
+| Pancreas | S2_Pancreas_Adeno_Distant_2004_2022_CSS.txt |
+| Colorectal | S2_Colorectal_Adeno_Distant_2004_2022_CSS.txt |
+| Stomach | S2_Stomach_Adeno_Distant_2004_2022_CSS.txt |
+
+Required headers are Patient ID, Record number recode, and
+SEER cause-specific death classification. Other exported columns are permitted.
+The CUP file can share its basename with the cohort export and reside
+in the CSS input directory.
+
+Patient ID and record number are imported as character values and uniquely
+identify the matching record. The module requires complete classification
+coverage of the final glandular cohort, with no duplicate input keys.
+Alive patients must have classification 0.
+
+Accepted classification labels and numeric values are 0 (Alive or dead of
+other cause), 1 (Dead attributable to this cancer dx), 8 (Dead with
+missing/unknown COD), and 9 (N/A not seq 0-59). The script uses the exact SEER
+labels in its coding map. Code 9 and missing/unrecognized values fail the
+analytic-cohort check. Use the published classification directly.
+See https://seer.cancer.gov/causespecific/ for classification rules.
+
+CSS censors other-cause deaths at their recorded death times.
+For code 8, separate analyses censor at death or treat death as cancer death.
+First-year estimates use 365.25 days and the same baseline weights and paired
+patient draws as OS.

@@ -1,22 +1,22 @@
-# Portable publication copy. Generated artifacts remain local and are ignored by Git.
+# Generated artifacts are written to local output directories.
 root <- Sys.getenv('CUP_PROJECT_ROOT', unset=normalizePath(getwd(), winslash='/'))
 setwd(root)
-for (p in c('work', 'work/histology_review', 'work/cancer_control_revision',
-            'outputs/method_reproducibility', 'outputs/stage2_preanalysis',
-            'outputs/validation_stage3', 'outputs/final_audit', 'outputs/histology_revision',
-            'outputs/pandemic_sensitivity', 'outputs/clinical_readability',
+for (p in c('work', 'work/glandular_models', 'work/landmark',
+            'outputs/standardization', 'outputs/cohort_checks',
+            'outputs/definition_models', 'outputs/era_models', 'outputs/glandular_models',
+            'outputs/pandemic_sensitivity', 'outputs/absolute_outcomes',
             'outputs/early_landmark', 'outputs/weight_capping', 'outputs/tissue_inference'))
   dir.create(p, recursive=TRUE, showWarnings=FALSE)
 suppressPackageStartupMessages(library(data.table));setDTthreads(2)
-root<-Sys.getenv('CUP_PROJECT_ROOT',unset=normalizePath(getwd(),winslash='/'));out<-file.path(root,'outputs/final_audit')
+root<-Sys.getenv('CUP_PROJECT_ROOT',unset=normalizePath(getwd(),winslash='/'));out<-file.path(root,'outputs/era_models')
 wt<-function(n,x)fwrite(x,file.path(out,paste0(n,'.csv')),bom=TRUE,na='NA')
 pt<-fread(file.path(out,'01_point_estimates.csv'));meta<-unique(pt[,.(label,scope,definition,period,group)])
-new<-readRDS(file.path(out,'bootstrap_replicates.rds'));labs<-readRDS(file.path(out,'bootstrap_labels.rds'))
-old<-readRDS(file.path(root,'outputs/validation_stage3/bootstrap_replicates.rds'));oldlabs<-names(readRDS(file.path(root,'work/stage3_model_cache.rds')))
-B<-length(new);stopifnot(B==2000L,length(old)==B,identical(vapply(new,function(x)x$b,integer(1)),1:B))
+comparison_result<-readRDS(file.path(out,'bootstrap_replicates.rds'));labs<-readRDS(file.path(out,'bootstrap_labels.rds'))
+reference_result<-readRDS(file.path(root,'outputs/definition_models/bootstrap_replicates.rds'));oldlabs<-names(readRDS(file.path(root,'work/definition_model_cache.rds')))
+B<-length(comparison_result);stopifnot(B==2000L,length(reference_result)==B,identical(vapply(comparison_result,function(x)x$b,integer(1)),1:B))
 measures<-unique(pt$measure);A<-array(NA_real_,c(B,nrow(meta),length(measures)),dimnames=list(NULL,meta$label,measures))
 ni<-match(labs,meta$label);oi<-match(paste0('Era__',oldlabs),meta$label);stopifnot(!anyNA(ni),!anyNA(oi))
-for(b in seq_len(B)){A[b,ni,]<-new[[b]]$v;A[b,oi,]<-old[[b]]$v}
+for(b in seq_len(B)){A[b,ni,]<-comparison_result[[b]]$v;A[b,oi,]<-reference_result[[b]]$v}
 stopifnot(!anyNA(A))
 ci<-function(x){v<-x[is.finite(x)];hh<-seq_along(x)<=length(x)/2;c(n=length(v),lo=unname(quantile(v,.025)),hi=unname(quantile(v,.975)),lo_family=unname(quantile(v,.00625)),hi_family=unname(quantile(v,.99375)),sd=sd(v),split95_endpoint_max_difference=max(abs(quantile(x[hh],c(.025,.975),na.rm=TRUE)-quantile(x[!hh],c(.025,.975),na.rm=TRUE))),split_family_endpoint_max_difference=max(abs(quantile(x[hh],c(.00625,.99375),na.rm=TRUE)-quantile(x[!hh],c(.00625,.99375),na.rm=TRUE))))}
 rows<-list()
@@ -47,7 +47,7 @@ for(def in c('Broad','Strict8140'))for(er in eras)for(g in groups[-1]){
 wt('33_time_window_contrast_CI',rbindlist(shape))
 # The same yearly CUP shares are used for every cancer within a definition/era.
 # Conditional survival is formed from the mixture survival, NOT an average of ratios.
-e<-readRDS(file.path(root,'work/stage2_eligible.rds'));dg<-fread(file.path(out,'02_model_diagnostics.csv'))
+e<-readRDS(file.path(root,'work/eligible_cohort.rds'));dg<-fread(file.path(out,'02_model_diagnostics.csv'))
 mixpt<-list();mixboot<-array(NA_real_,c(B,40L,length(measures)))
 idx<-0L
 for(def in c('Broad','Strict8140'))for(er in eras)for(g in groups){
@@ -55,7 +55,7 @@ for(def in c('Broad','Strict8140'))for(er in eras)for(g in groups){
  q<-as.numeric(table(factor(e[group=='CUP'&as.character(era)==er&(def=='Broad'|hist==8140),year],levels=yrs)));q<-q/sum(q)
  pp<-sapply(labs_y,getp);mp<-as.numeric(pp%*%q);mp[6]<-mp[2]/mp[1]
  for(b in seq_len(B)){
-  qb<-(if(def=='Broad')new[[b]]$q else new[[b]]$qs)[match(yrs,2004:2022)];qb<-qb/sum(qb)
+  qb<-(if(def=='Broad')comparison_result[[b]]$q else comparison_result[[b]]$qs)[match(yrs,2004:2022)];qb<-qb/sum(qb)
   z<-t(A[b,labs_y,,drop=FALSE][1,,]);v<-as.numeric(z%*%qb);v[6]<-v[2]/v[1];mixboot[b,idx,]<-v
  }
  pass<-all(dg[match(labs_y,label),support_pass]);bad<-paste(yrs[!dg[match(labs_y,label),support_pass]],collapse=';')
@@ -80,9 +80,9 @@ for(def in c('Broad','Strict8140'))for(er in eras)for(g in groups[-1]){
 mg<-rbindlist(mg);mc<-rbindlist(mc);wt('26_year_balanced_gaps_CI',mg);wt('27_year_balanced_gap_changes_CI',mc)
 cmp<-merge(change[measure=='OS365'],mc[measure=='OS365'],by=c('definition','era','control','measure'),suffixes=c('_era','_yearbalanced'));cmp[,year_mix_shift_pp:=100*(estimate_yearbalanced-estimate_era)]
 wt('28_year_mix_effect_on_primary',cmp)
-fails<-fread(file.path(out,'13_bootstrap_failures.csv'));success<-mean(vapply(new,function(z)all(!nzchar(z$error)),logical(1)))
+fails<-fread(file.path(out,'13_bootstrap_failures.csv'));success<-mean(vapply(comparison_result,function(z)all(!nzchar(z$error)),logical(1)))
 stopifnot(success>=.95,nrow(fails)==0L)
-saveRDS(list(meta=meta,A=A,year_mix=mix,year_mix_boot=mixboot),file.path(root,'work/final_audit_summary_arrays.rds'))
+saveRDS(list(meta=meta,A=A,year_mix=mix,year_mix_boot=mixboot),file.path(root,'work/era_models_summary_arrays.rds'))
 capture.output(print(cmp[definition=='Broad'&era=='2020-2022',.(control,estimate_era,lo_era,hi_era,estimate_yearbalanced,lo_yearbalanced,hi_yearbalanced,year_mix_shift_pp,support_pass)]),file=file.path(out,'PRIMARY_RESULTS_console.txt'))
 writeLines(paste('Bootstrap complete;',B,'replicates;',length(labs),'additional models per replicate; all-model success',success),file.path(out,'CI_COMPLETE.txt'))
 print(cmp[definition=='Broad'&era=='2020-2022',.(control,estimate_era,estimate_yearbalanced,year_mix_shift_pp,support_pass)])

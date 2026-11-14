@@ -1,14 +1,14 @@
-# Portable publication copy. Generated artifacts remain local and are ignored by Git.
+# Generated artifacts are written to local output directories.
 root <- Sys.getenv('CUP_PROJECT_ROOT', unset=normalizePath(getwd(), winslash='/'))
 setwd(root)
-for (p in c('work', 'work/histology_review', 'work/cancer_control_revision',
-            'outputs/method_reproducibility', 'outputs/stage2_preanalysis',
-            'outputs/validation_stage3', 'outputs/final_audit', 'outputs/histology_revision',
-            'outputs/pandemic_sensitivity', 'outputs/clinical_readability',
+for (p in c('work', 'work/glandular_models', 'work/landmark',
+            'outputs/standardization', 'outputs/cohort_checks',
+            'outputs/definition_models', 'outputs/era_models', 'outputs/glandular_models',
+            'outputs/pandemic_sensitivity', 'outputs/absolute_outcomes',
             'outputs/early_landmark', 'outputs/weight_capping', 'outputs/tissue_inference'))
   dir.create(p, recursive=TRUE, showWarnings=FALSE)
 library(data.table);library(jsonlite)
-root<-Sys.getenv('CUP_PROJECT_ROOT',unset=normalizePath(getwd(),winslash='/'));out<-file.path(root,'outputs/method_reproducibility')
+root<-Sys.getenv('CUP_PROJECT_ROOT',unset=normalizePath(getwd(),winslash='/'));out<-file.path(root,'outputs/standardization')
 z<-fread(file.path(out,'50_annual_CUP_composition.csv'));stopifnot(identical(z$year,2004:2022),sum(z$n)==27715)
 # Figure contract: descriptive composition changes, not evidence of reclassification.
 # Quantitative grid; equal axes widths, separate percentage scales for common/unknown categories.
@@ -26,13 +26,13 @@ draw<-function(){
   f<-par('fig');p<-par('plt');ds<-dev.size('in')*72
   bounds[[i]]<-list(id=c('a','b')[i],bbox_pt=c((f[1]+p[1]*diff(f[1:2]))*ds[1],(f[3]+p[3]*diff(f[3:4]))*ds[2],(f[1]+p[2]*diff(f[1:2]))*ds[1],(f[3]+p[4]*diff(f[3:4]))*ds[2]))
  }
- mtext('Unweighted annual proportions in the reviewed CUP cohort. Lines join observed years; no smoothing or trend test.',side=1,outer=TRUE,line=.25,cex=.78)
+ mtext('Unweighted annual proportions in the glandular CUP cohort. Lines join observed years; no smoothing or trend test.',side=1,outer=TRUE,line=.25,cex=.78)
  list(schema_version=1,figure=list(width_pt=dev.size('in')[1]*72,height_pt=dev.size('in')[2]*72),panels=bounds,row_groups=list(list(id='composition',panels=c('a','b'))))
 }
 png(file.path(out,'FigureS3_annual_CUP_composition.png'),width=2400,height=1440,res=300);geo<-draw();dev.off()
 svglite::svglite(file.path(out,'FigureS3_annual_CUP_composition.svg'),width=8,height=4.8);draw();dev.off()
 write_json(geo,file.path(out,'FigureS3.alignment-layout.json'),auto_unbox=TRUE,pretty=TRUE)
 # Original pooled-reference knot positions for every era model, held fixed in bootstrap.
-e<-readRDS(file.path(root,'work/stage2_eligible.rds'));cfg<-fromJSON(file.path(root,'config/histology_definitions.json'));e<-e[hist%in%cfg$reviewed_keep_codes];ref<-e[group=='CUP']
+e<-readRDS(file.path(root,'work/eligible_cohort.rds'));cfg<-fromJSON(file.path(root,'config/histology_definitions.json'));e<-e[hist%in%cfg$glandular_codes];ref<-e[group=='CUP']
 knots<-list();for(er in levels(e$era))for(g in c('CUP','Lung','Pancreas','Colorectal','Stomach')){a<-splines::ns(c(ref$age,e[group==g&era==er,age]),df=4);knots[[length(knots)+1]]<-data.table(era=er,group=g,internal_knots=paste(attr(a,'knots'),collapse=';'),boundary_knots=paste(attr(a,'Boundary.knots'),collapse=';'))}
 fwrite(rbindlist(knots),file.path(out,'53_primary_spline_settings.csv'))

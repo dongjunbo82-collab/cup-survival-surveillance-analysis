@@ -1,25 +1,25 @@
-# Portable publication copy. Generated artifacts remain local and are ignored by Git.
+# Generated artifacts are written to local output directories.
 root <- Sys.getenv('CUP_PROJECT_ROOT', unset=normalizePath(getwd(), winslash='/'))
 setwd(root)
-for (p in c('work', 'work/histology_review', 'work/cancer_control_revision',
-            'outputs/method_reproducibility', 'outputs/stage2_preanalysis',
-            'outputs/validation_stage3', 'outputs/final_audit', 'outputs/histology_revision',
-            'outputs/pandemic_sensitivity', 'outputs/clinical_readability',
+for (p in c('work', 'work/glandular_models', 'work/landmark',
+            'outputs/standardization', 'outputs/cohort_checks',
+            'outputs/definition_models', 'outputs/era_models', 'outputs/glandular_models',
+            'outputs/pandemic_sensitivity', 'outputs/absolute_outcomes',
             'outputs/early_landmark', 'outputs/weight_capping', 'outputs/tissue_inference'))
   dir.create(p, recursive=TRUE, showWarnings=FALSE)
 library(data.table)
 setDTthreads(1)
 root <- Sys.getenv('CUP_PROJECT_ROOT',unset=normalizePath(getwd(),winslash='/'))
 dest <- file.path(root,'outputs/pandemic_sensitivity');dir.create(dest,showWarnings=FALSE)
-src <- file.path(root,'outputs/histology_revision')
+src <- file.path(root,'outputs/glandular_models')
 pt <- fread(file.path(src,'04_point_estimates.csv'))
-ss <- readRDS(file.path(root,'work/histology_review/summary_arrays.rds'))
+ss <- readRDS(file.path(root,'work/glandular_models/summary_arrays.rds'))
 A<-ss$A;stopifnot(dim(A)[1]==2000,!anyNA(A))
 ci<-function(v)c(n=length(v),lo=unname(quantile(v,.025)),hi=unname(quantile(v,.975)),lo_family=unname(quantile(v,.00625)),hi_family=unname(quantile(v,.99375)))
 lab<-function(def,er,g)paste('Era',def,er,g,sep='__')
 pval<-function(l)pt[label==l&measure=='OS365',estimate]
 rows<-list()
-for(def in c('Reviewed','MinimalNoNE'))for(early in c('2004-2007','2008-2014'))for(g in c('Lung','Pancreas','Colorectal','Stomach')){
+for(def in c('Glandular','MinimalNoNE'))for(early in c('2004-2007','2008-2014'))for(g in c('Lung','Pancreas','Colorectal','Stomach')){
  ll<-c(lab(def,'2015-2019','CUP'),lab(def,'2015-2019',g),lab(def,early,'CUP'),lab(def,early,g))
  v<-A[,ll[1],'OS365']-A[,ll[2],'OS365']-A[,ll[3],'OS365']+A[,ll[4],'OS365']
  pp<-sum(vapply(ll,pval,numeric(1))*c(1,-1,-1,1))
@@ -27,11 +27,11 @@ for(def in c('Reviewed','MinimalNoNE'))for(early in c('2004-2007','2008-2014'))f
 }
 res<-rbindlist(rows);fwrite(res,file.path(dest,'33_prepandemic_gap_changes_CI.csv'),bom=TRUE)
 # Check the first contrast against already preserved era contrasts.
-old<-fread(file.path(src,'17_gap_changes_CI.csv'))[era=='2015-2019'&measure=='OS365']
-cmp<-merge(res[earlier=='2004-2007'],old,by=c('definition','control'),suffixes=c('_new','_old'))
-stopifnot(nrow(cmp)==8,max(abs(cmp$estimate_new-cmp$estimate_old))<1e-12,max(abs(cmp$lo_new-cmp$lo_old))<1e-12,max(abs(cmp$hi_new-cmp$hi_old))<1e-12)
+reference_result<-fread(file.path(src,'17_gap_changes_CI.csv'))[era=='2015-2019'&measure=='OS365']
+cmp<-merge(res[earlier=='2004-2007'],reference_result,by=c('definition','control'),suffixes=c('_comparison','_reference'))
+stopifnot(nrow(cmp)==8,max(abs(cmp$estimate_comparison-cmp$estimate_reference))<1e-12,max(abs(cmp$lo_comparison-cmp$lo_reference))<1e-12,max(abs(cmp$hi_comparison-cmp$hi_reference))<1e-12)
 dg<-fread(file.path(src,'05_weight_diagnostics.csv'))
-annual<-pt[scope=='Annual'&definition=='Reviewed'&measure=='OS365'&group%in%c('CUP','Lung','Pancreas')]
+annual<-pt[scope=='Annual'&definition=='Glandular'&measure=='OS365'&group%in%c('CUP','Lung','Pancreas')]
 ac<-rbindlist(lapply(seq_len(nrow(annual)),function(i){z<-annual[i];cbind(z,as.data.table(as.list(ci(A[,z$label,'OS365']))))}))
 ac<-merge(ac,dg[,.(label,support_pass,max_SMD,ESS)],by='label',all.x=TRUE)
 stopifnot(nrow(ac)==57,all(ac$support_pass))
@@ -50,13 +50,13 @@ for(g in names(cols)){
 }
 mtext('Bands: pointwise 95% bootstrap CI. Gray background: diagnosis years 2020-2022.',side=1,outer=TRUE,line=.2,cex=.8)
 dev.off()
-fwrite(data.table(check=c('2000 shared bootstrap draws','Archived contrast reproduced','57 annual models pass support'),passed=TRUE),file.path(dest,'35_sensitivity_QA.csv'))
-writeLines(c('Post hoc supplemental analysis dated 2026-10-31. No outcome models were refitted.',
+fwrite(data.table(check=c('2000 shared bootstrap draws','Paired contrast verified','57 annual models pass support'),passed=TRUE),file.path(dest,'35_sensitivity_QA.csv'))
+writeLines(c('Exploratory contrasts use the shared bootstrap estimates.',
 'Uses the preserved paired 2,000 patient bootstrap draws and fixed full-period pooled CUP target.',
 '33: changes in CUP-minus-control 1-year OS gaps, 2015-2019 minus the named earlier era. Probability units; multiply by 100 for percentage points.',
-'lo/hi: nominal 95% percentile CI. lo_family/hi_family: exploratory four-control Bonferroni intervals within each era contrast; not a new prespecified primary family.',
-'The comparison with 2004-2007 reproduces existing archived output; the comparison with 2008-2014 is newly derived from the same paired draws.',
+'lo/hi: nominal 95% percentile CI. lo_family/hi_family: exploratory four-control Bonferroni intervals within each era contrast; not a separate prespecified primary family.',
+'Both earlier-era comparisons use the same paired bootstrap draws.',
 'Excluding pandemic-era diagnoses does not exclude all pandemic-era follow-up: some 2019 diagnoses have 1-year follow-up into 2020. This is not a causal estimate of the pandemic effect.',
 '34: annual OS for CUP, lung and pancreas; all 57 fits pass support. The figure uses pointwise, not simultaneous, confidence bands.',
 'Annual colorectal and stomach series omitted because their support criteria fail in some years.'),file.path(dest,'README.txt'))
-print(res[definition=='Reviewed'])
+print(res[definition=='Glandular'])
